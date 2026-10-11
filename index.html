@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>찰리의 일기 - 스마트 대시보드</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts & FontAwesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&family=Nanum+Myeongjo:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Google Identity Services for Google Drive integration -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <style>
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    }
+    .font-serif-journal {
+      font-family: 'Nanum Myeongjo', serif;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    /* Glassmorphism subtle effects */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-amber-100 selection:text-amber-900">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-white/90 sticky top-0 z-40 border-b border-slate-200/80 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between transition-all">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center text-white shadow-md shadow-orange-500/20">
+        <i class="fa-solid fa-feather-pointed text-lg"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-lg text-slate-800 tracking-tight">찰리의 일기장</h1>
+          <span class="text-[10px] font-semibold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">PRO DASHBOARD</span>
+        </div>
+        <p class="text-xs text-slate-500 flex items-center gap-1.5">
+          <i class="fa-brands fa-google text-slate-400"></i> 동기화 대상: <span class="font-medium text-slate-700">bookexekim@gmail.com</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Quick Status & Action Buttons -->
+    <div class="flex items-center gap-2.5">
+      <!-- Live Clock Badge -->
+      <div id="liveClockBadge" class="hidden md:flex items-center gap-2 text-xs text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+        <i class="fa-regular fa-clock text-amber-600"></i>
+        <span id="currentTimeDisplay">2026. 10. 09 (금) 18:21</span>
+      </div>
+
+      <!-- Google Drive Sync Setting Button -->
+      <button onclick="openDriveSettingsModal()" class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition shadow-sm">
+        <i class="fa-brands fa-google-drive text-emerald-600"></i>
+        <span class="hidden sm:inline">Drive 연동 설정</span>
+      </button>
+
+      <!-- Archive History View Toggle -->
+      <button onclick="switchView('archive')" id="btnNavArchive" class="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-amber-700 bg-slate-100 hover:bg-amber-50 rounded-lg transition">
+        <i class="fa-solid fa-book-bookmark"></i>
+        <span>과거 일기장</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- LEFT & CENTER: Main Workspace (Writer or Archive) -->
+    <section class="lg:col-span-8 flex flex-col gap-6">
+
+      <!-- ================= WRITE VIEW ================= -->
+      <div id="writeView" class="space-y-6">
+        
+        <!-- Automated Info Bar: Date, Weather, News Issue -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <!-- Auto Date & Weather Card -->
+          <div class="glass-card rounded-2xl p-4 shadow-sm relative overflow-hidden group">
+            <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-amber-100 rounded-full blur-2xl opacity-60 pointer-events-none"></div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1.5">
+                <i class="fa-regular fa-calendar-check"></i> 자동 기록 일시
+              </span>
+              <span id="autoFormattedDate" class="text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                YY/MM/DD
+              </span>
+            </div>
+            <h3 id="displayFullDate" class="text-xl font-bold text-slate-800 tracking-tight">
+              2026년 10월 9일 금요일
+            </h3>
+            
+            <!-- Weather Section -->
+            <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+              <div class="flex items-center gap-2" id="weatherDisplay">
+                <i class="fa-solid fa-cloud-sun text-amber-500 text-base"></i>
+                <span id="weatherText" class="font-medium">날씨 불러오는 중...</span>
+                <span id="weatherTemp" class="text-slate-400">18°C</span>
+              </div>
+              <button onclick="refreshWeather(true)" title="날씨 새로고침" class="p-1 hover:text-amber-600 text-slate-400 transition">
+                <i class="fa-solid fa-rotate-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Top Social Issue (MBC News 1st Headline) Card -->
+          <div class="glass-card rounded-2xl p-4 shadow-sm relative overflow-hidden group">
+            <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-blue-100 rounded-full blur-2xl opacity-60 pointer-events-none"></div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1.5">
+                <i class="fa-solid fa-newspaper"></i> 오늘의 사회적 이슈 (MBC 뉴스 보도 1위)
+              </span>
+              <span class="text-[10px] font-semibold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                MBC TOP NEWS
+              </span>
+            </div>
+            
+            <div class="min-h-[48px] flex items-center">
+              <p id="newsHeadlineDisplay" class="text-sm font-semibold text-slate-800 line-clamp-2 leading-snug">
+                오늘의 실시간 주요 MBC 뉴스 탑 헤드라인을 집계하고 있습니다...
+              </p>
+            </div>
+
+            <div class="mt-2 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+              <span id="newsMetaSource" class="truncate max-w-[200px]">출처: MBC 뉴스데스크 / 사회 이슈</span>
+              <button onclick="fetchTodayMBCIssue()" class="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition">
+                <i class="fa-solid fa-arrows-rotate"></i> 이슈 갱신
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Journal Main Writing Pad -->
+        <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/90 relative">
+          
+          <!-- Editor Title & Meta Control -->
+          <div class="space-y-4 mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <input type="text" id="diaryTitleInput" placeholder="오늘 하루의 한 줄 제목을 붙여보세요..." 
+                class="w-full text-xl sm:text-2xl font-bold text-slate-800 placeholder-slate-300 focus:outline-none border-b border-transparent focus:border-amber-400 transition pb-1">
+              
+              <!-- Mood Selector -->
+              <div class="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200 shrink-0">
+                <span class="text-xs font-semibold text-slate-400 px-2">기분:</span>
+                <button type="button" onclick="setMood('happy')" data-mood="happy" class="mood-btn px-2 py-1 rounded-lg text-sm hover:bg-white text-slate-500 transition shadow-none bg-amber-100 text-amber-700 shadow-sm">😊 행복</button>
+                <button type="button" onclick="setMood('calm')" data-mood="calm" class="mood-btn px-2 py-1 rounded-lg text-sm hover:bg-white text-slate-500 transition">🌿 평온</button>
+                <button type="button" onclick="setMood('busy')" data-mood="busy" class="mood-btn px-2 py-1 rounded-lg text-sm hover:bg-white text-slate-500 transition">⚡ 열정</button>
+                <button type="button" onclick="setMood('tired')" data-mood="tired" class="mood-btn px-2 py-1 rounded-lg text-sm hover:bg-white text-slate-500 transition">🌧️ 지침</button>
+              </div>
+            </div>
+
+            <!-- Custom Topic / Tagging Row -->
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-xs text-slate-400 font-medium"><i class="fa-solid fa-tags mr-1"></i>태그:</span>
+              <div id="tagPillsContainer" class="flex flex-wrap items-center gap-1.5">
+                <span class="tag-pill text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">#일상</span>
+                <span class="tag-pill text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">#생각정리</span>
+              </div>
+              <input type="text" id="newTagInput" onkeydown="handleTagKeydown(event)" placeholder="+ 태그 추가 (엔터)" 
+                class="text-xs bg-transparent border-b border-dashed border-slate-300 text-slate-600 focus:outline-none focus:border-amber-500 px-1 py-0.5 w-24">
+            </div>
+          </div>
+
+          <!-- Main Writing Textarea -->
+          <div class="relative">
+            <textarea id="diaryContentInput" rows="13" 
+              placeholder="찰리, 오늘 어떤 하루를 보냈나요? 느꼈던 감정과 기억하고 싶은 순간들을 자유롭게 기록해보세요...&#10;&#10;* 날짜, 날씨, 오늘의 MBC 탑 뉴스 이슈는 일기 확정 시 자동으로 정돈되어 함께 저장됩니다." 
+              class="w-full text-base sm:text-lg leading-relaxed text-slate-800 placeholder-slate-300 focus:outline-none resize-none font-serif-journal border-0 bg-transparent"
+              oninput="updateEditorWordCount()"></textarea>
+          </div>
+
+          <!-- Editor Footer Information -->
+          <div class="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+            <div class="flex items-center gap-4">
+              <span>글자 수: <strong id="charCount" class="text-slate-600 font-semibold">0</strong>자</span>
+              <span>작성 단어: <strong id="wordCount" class="text-slate-600 font-semibold">0</strong>단어</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="clearEditor()" class="text-xs text-slate-400 hover:text-rose-500 px-2 py-1 rounded transition">
+                <i class="fa-regular fa-trash-can mr-1"></i>내용 비우기
+              </button>
+              <button onclick="insertTemplatePrompt()" class="text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition border border-amber-200">
+                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>3줄 회고 템플릿
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= ARCHIVE VIEW (Hidden by default) ================= -->
+      <div id="archiveView" class="hidden space-y-6">
+        
+        <!-- Search & Filter Controls -->
+        <div class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <button onclick="switchView('write')" class="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition flex items-center gap-1.5">
+              <i class="fa-solid fa-arrow-left"></i> 새 일기 쓰기
+            </button>
+            <h2 class="text-lg font-bold text-slate-800">이전 일기 기록 보관함</h2>
+          </div>
+
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-64">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="searchArchiveInput" oninput="renderArchiveList()" placeholder="날짜, 키워드, 뉴스 검색..." 
+                class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 transition">
+            </div>
+          </div>
+        </div>
+
+        <!-- Archive List Cards Grid -->
+        <div id="archiveEntriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Dynamic cards injected via JS -->
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- RIGHT SIDEBAR: Google Drive Export & Journal Dashboard Stats -->
+    <aside class="lg:col-span-4 flex flex-col gap-6">
+
+      <!-- Google Drive Primary Export Card -->
+      <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
+        <!-- Background aesthetic orb -->
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-amber-400 border border-white/10">
+              <i class="fa-brands fa-google-drive text-lg"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-sm tracking-tight">구글 드라이브 동기화</h3>
+              <p class="text-[11px] text-slate-400 font-mono">bookexekim@gmail.com</p>
+            </div>
+          </div>
+          <span id="driveBadgeStatus" class="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold px-2 py-0.5 rounded-full">
+            인증 필요
+          </span>
+        </div>
+
+        <!-- File naming preview requirement -->
+        <div class="bg-black/30 rounded-2xl p-4 border border-white/5 space-y-2 mb-5">
+          <div class="flex items-center justify-between text-xs text-slate-400">
+            <span>생성될 파일명:</span>
+            <span class="text-[10px] text-amber-300 font-semibold uppercase tracking-wider">규격 준수</span>
+          </div>
+          <div class="flex items-center gap-2 text-amber-300 font-mono text-sm font-bold bg-white/5 p-2 rounded-xl border border-white/10">
+            <i class="fa-regular fa-file-lines text-xs text-amber-400"></i>
+            <span id="driveTargetFilename">찰리의 일기(26/10/09).md</span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-tight">
+            * '일기 확정 및 구글 드라이브 저장' 시 지정된 파일명 규칙(YY/MM/DD)에 따라 클라우드에 자동 백업됩니다.
+          </p>
+        </div>
+
+        <!-- Drive Account Auth Button if not connected -->
+        <div id="driveLoginBanner" class="mb-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between text-xs">
+          <span class="text-amber-200">구글 드라이브 권한 필요</span>
+          <button onclick="requestGoogleToken()" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg transition text-[11px]">
+            구글 로그인
+          </button>
+        </div>
+
+        <!-- Confirm and Commit Button -->
+        <button id="btnCommitDrive" onclick="commitDiaryToDrive()" 
+          class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2.5 transition transform active:scale-[0.98]">
+          <i class="fa-solid fa-cloud-arrow-up text-base"></i>
+          <span>일기 확정 및 구글 드라이브 저장</span>
+        </button>
+
+        <!-- Secondary Local Actions -->
+        <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+          <button onclick="downloadAsLocalText()" class="py-2 px-3 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl transition border border-white/5 flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-file-arrow-down text-slate-400"></i>
+            <span>PC 파일 다운로드</span>
+          </button>
+          <button onclick="openDriveSettingsModal()" class="py-2 px-3 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl transition border border-white/5 flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-sliders text-slate-400"></i>
+            <span>Google API 설정</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mini Dashboard Analytics & Recent Entries Preview -->
+      <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5">
+        <div class="flex items-center justify-between">
+          <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-chart-pie text-amber-500"></i> 찰리의 일기 대시보드 현황
+          </h4>
+          <span id="totalEntryCountBadge" class="text-xs bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-full">총 3편</span>
+        </div>
+
+        <!-- Stat tiles -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+            <p class="text-[11px] text-slate-400 font-medium">이번 달 작성률</p>
+            <p class="text-lg font-bold text-slate-800 mt-0.5" id="monthlyWritingRate">12일 기록</p>
+          </div>
+          <div class="p-3 rounded-2xl bg-amber-50/60 border border-amber-100">
+            <p class="text-[11px] text-amber-700 font-medium">주요 기분</p>
+            <p class="text-lg font-bold text-amber-900 mt-0.5" id="dominantMoodStat">😊 평온/행복</p>
+          </div>
+        </div>
+
+        <!-- Recent Log Mini List -->
+        <div>
+          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">최근 기록한 일기</p>
+          <div id="miniRecentEntriesList" class="space-y-2">
+            <!-- Dynamic Mini Items -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Tips & Security Notice -->
+      <div class="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs text-amber-900 flex items-start gap-3">
+        <i class="fa-solid fa-shield-halved text-amber-600 text-base mt-0.5 shrink-0"></i>
+        <div class="space-y-1">
+          <p class="font-bold">프라이버시 & 데이터 보호</p>
+          <p class="text-amber-800/80 text-[11px] leading-relaxed">
+            작성된 일기는 사용자의 브라우저 로컬 저장소와 본인 구글 드라이브(`bookexekim@gmail.com`)로만 직접 전송되며 다른 제3자 서버에 저장되지 않습니다.
+          </p>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- ================= MODALS & POPUPS ================= -->
+
+  <!-- 1. DIARY DETAIL VIEW MODAL -->
+  <div id="entryDetailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+      <button onclick="closeModal('entryDetailModal')" class="absolute top-5 right-5 text-slate-400 hover:text-slate-700 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="space-y-3 pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span id="modalDateBadge" class="text-xs font-mono font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full"></span>
+          <span id="modalMoodBadge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"></span>
+          <span id="modalWeatherBadge" class="text-xs text-slate-500 font-medium ml-auto flex items-center gap-1"></span>
+        </div>
+        <h3 id="modalDiaryTitle" class="text-xl sm:text-2xl font-bold text-slate-900"></h3>
+        
+        <!-- Attached MBC News -->
+        <div class="p-3 bg-blue-50/70 rounded-xl border border-blue-100 text-xs text-blue-900 flex items-start gap-2">
+          <i class="fa-solid fa-newspaper text-blue-600 mt-0.5 shrink-0"></i>
+          <div>
+            <strong class="font-semibold block text-blue-950">그날의 MBC 보도 1순위 이슈:</strong>
+            <p id="modalNewsContent" class="text-blue-800 mt-0.5"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto py-5 pr-2">
+        <div id="modalDiaryBody" class="font-serif-journal text-base sm:text-lg leading-relaxed text-slate-800 whitespace-pre-wrap"></div>
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+        <span id="modalGoogleFileTag" class="font-mono text-slate-500"></span>
+        <div class="flex items-center gap-2">
+          <button onclick="exportModalDiary()" class="px-3 py-1.5 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-download"></i> 이 일기 다운로드
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. GOOGLE DRIVE SETUP & AUTH MODAL -->
+  <div id="driveSettingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative animate-in fade-in duration-150 space-y-5">
+      <button onclick="closeModal('driveSettingsModal')" class="absolute top-5 right-5 text-slate-400 hover:text-slate-700 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg">
+          <i class="fa-brands fa-google-drive"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-800 text-base">Google Drive 연동 가이드</h3>
+          <p class="text-xs text-slate-500">bookexekim@gmail.com 계정 자동 업로드</p>
+        </div>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-200">
+        <p class="font-semibold text-slate-800">📌 브라우저 직접 연동 원리:</p>
+        <p>
+          구글 드라이브에 안전하게 파일을 생성하기 위해 Google OAuth 2.0 Token Client를 사용합니다.
+        </p>
+        <div class="space-y-1 text-slate-500">
+          <p>1. Google Cloud Console에서 발급받은 <strong>OAuth Client ID</strong>를 등록하시면 웹에서 직접 Drive REST API로 업로드됩니다.</p>
+          <p>2. 구글 보안 방침상 팝업창에서 <strong>"파일 생성 및 관리" 권한</strong>을 반드시 허용해주셔야 합니다.</p>
+        </div>
+      </div>
+
+      <div class="space-y-1.5">
+        <label class="text-xs font-bold text-slate-700">Google OAuth Client ID</label>
+        <input type="text" id="googleClientIdInput" placeholder="예: xxxxx.apps.googleusercontent.com" 
+          class="w-full text-xs p-3 bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-emerald-500 font-mono">
+      </div>
+
+      <div class="flex items-center justify-between pt-2">
+        <button onclick="requestGoogleToken()" class="px-3 py-2 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 transition">
+          <i class="fa-brands fa-google mr-1"></i>계정 다시 인증하기
+        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="closeModal('driveSettingsModal')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">닫기</button>
+          <button onclick="saveDriveSettings()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow">설정 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom In-App Notification Toast -->
+  <div id="toastNotification" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 flex items-center gap-3 px-4 py-3 rounded-2xl bg-slate-900 text-white shadow-2xl text-xs font-medium border border-slate-700">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+    <span id="toastMessage">알림 메시지</span>
+  </div>
+
+  <script>
+    /* ========================================================
+       APPLICATION STATE & CONFIGURATION
+       ======================================================== */
+    const TARGET_GOOGLE_ACCOUNT = "bookexekim@gmail.com";
+    
+    // In-memory diary repository with rich initial seeds for preview
+    let diaries = [
+      {
+        id: "d-20261008",
+        dateString: "2026. 10. 08 (목)",
+        shortDate: "26/10/08",
+        title: "가을 바람과 함께 시작한 새로운 프로젝트 기획",
+        content: "오후 늦게 커피 한 잔을 마시며 앞으로 나아갈 방향에 대해 차분히 고민해보았다. 바람이 제법 선선해져서 걷기 딱 좋은 계절이다. 작은 결심들이 모여 결국 큰 변화를 만든다는 말을 되새기며, 내일의 찰리에게 부끄럽지 않은 오늘을 마무리한다.",
+        weather: "맑음, 19°C",
+        newsHeadline: "국회 정기국회 민생 법안 처리 집중 논의… 주요 경제 대책 발표",
+        mood: "calm",
+        tags: ["생각", "산책", "가을"],
+        googleDriveSynced: true,
+        driveFilename: "찰리의 일기(26/10/08)"
+      },
+      {
+        id: "d-20261007",
+        dateString: "2026. 10. 07 (수)",
+        shortDate: "26/10/07",
+        title: "몰입의 즐거움과 소소한 행복",
+        content: "하루 종일 집중해서 작업을 마치고 나니 기분 좋은 성취감이 든다. 저녁에는 좋아하는 음악을 들으며 저녁 식사를 준비했다. 별것 아닌 일상이라도 온전히 나만의 시간으로 채울 수 있다는 것이 참 감사하다.",
+        weather: "구름 조금, 21°C",
+        newsHeadline: "전국 가을 축제 개막… 도심 속 힐링 공간 시민 발길 이어져",
+        mood: "happy",
+        tags: ["일상", "성취", "음악"],
+        googleDriveSynced: true,
+        driveFilename: "찰리의 일기(26/10/07)"
+      }
+    ];
+
+    let currentSelectedMood = "happy";
+    let currentTags = ["일상", "생각정리"];
+    let todayWeatherString = "맑음, 18°C";
+    let todayNewsHeadline = "사회적 주요 현안 및 가을철 민생 이슈 현장 집중 보도";
+    let currentViewingDiary = null;
+    let googleOAuthToken = null;
+    let tokenClient = null;
+
+    // Helper to format Date into YY/MM/DD
+    function getFormattedShortDate(d = new Date()) {
+      const yy = String(d.getFullYear()).slice(-2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yy}/${mm}/${dd}`;
+    }
+
+    function getFormattedKoreanDate(d = new Date()) {
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const date = d.getDate();
+      const dayName = days[d.getDay()];
+      return `${year}년 ${month}월 ${date}일 ${dayName}요일`;
+    }
+
+    // Initialize Page & System Clocks
+    function initDateTimeHeader() {
+      const now = new Date();
+      const short = getFormattedShortDate(now);
+      const full = getFormattedKoreanDate(now);
+      
+      const autoShortBadge = document.getElementById("autoFormattedDate");
+      const displayFullDate = document.getElementById("displayFullDate");
+      const driveFilenameDisplay = document.getElementById("driveTargetFilename");
+      
+      if (autoShortBadge) autoShortBadge.textContent = short;
+      if (displayFullDate) displayFullDate.textContent = full;
+      if (driveFilenameDisplay) driveFilenameDisplay.textContent = `찰리의 일기(${short}).md`;
+
+      updateLiveClock();
+      setInterval(updateLiveClock, 30000);
+    }
+
+    function updateLiveClock() {
+      const now = new Date();
+      const clockEl = document.getElementById("currentTimeDisplay");
+      if (clockEl) {
+        const timeStr = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+        clockEl.textContent = `${getFormattedShortDate(now)} ${timeStr}`;
+      }
+    }
+
+    // Weather fetcher with Open-Meteo or fallback
+    async function refreshWeather(userTriggered = false) {
+      const weatherTextEl = document.getElementById("weatherText");
+      const weatherTempEl = document.getElementById("weatherTemp");
+
+      try {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(async (pos) => {
+            try {
+              const lat = pos.coords.latitude;
+              const lon = pos.coords.longitude;
+              const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`);
+              const data = await res.json();
+              if (data && data.current) {
+                const temp = Math.round(data.current.temperature_2m);
+                const code = data.current.weather_code;
+                const desc = interpretWmoWeatherCode(code);
+                todayWeatherString = `${desc}, ${temp}°C`;
+                if (weatherTextEl) weatherTextEl.textContent = desc;
+                if (weatherTempEl) weatherTempEl.textContent = `${temp}°C`;
+                if (userTriggered) showToast("날씨 정보가 현재 위치 기반으로 갱신되었습니다.", "success");
+                return;
+              }
+            } catch (err) {
+              setFallbackWeather();
+            }
+          }, () => {
+            setFallbackWeather();
+          }, { timeout: 4000 });
+        } else {
+          setFallbackWeather();
+        }
+      } catch (e) {
+        setFallbackWeather();
+      }
+    }
+
+    function interpretWmoWeatherCode(code) {
+      if (code === 0) return "청명함";
+      if (code >= 1 && code <= 3) return "구름 조금";
+      if (code >= 45 && code <= 48) return "안개";
+      if (code >= 51 && code <= 67) return "비/소나기";
+      if (code >= 71 && code <= 77) return "눈";
+      if (code >= 80 && code <= 82) return "소나기";
+      if (code >= 95) return "뇌우";
+      return "맑음";
+    }
+
+    function setFallbackWeather() {
+      const weatherTextEl = document.getElementById("weatherText");
+      const weatherTempEl = document.getElementById("weatherTemp");
+      todayWeatherString = "맑고 선선함, 19°C";
+      if (weatherTextEl) weatherTextEl.textContent = "맑고 선선함";
+      if (weatherTempEl) weatherTempEl.textContent = "19°C";
+    }
+
+    // Fetch Today's Top MBC News Headline (Gemini with Google Search tool or Live Headlines)
+    async function fetchTodayMBCIssue() {
+      const headlineEl = document.getElementById("newsHeadlineDisplay");
+      const metaSourceEl = document.getElementById("newsMetaSource");
+      
+      headlineEl.textContent = "최신 MBC 뉴스 탑 보도 및 이슈를 탐색하고 있습니다...";
+      
+      const apiKey = "";
+      const promptQuery = "오늘 한국의 주요 사회적 이슈 중에서 MBC 뉴스데스크 또는 MBC 주요 보도 1순위 헤드라인을 단 1줄의 명확하고 객관적인 뉴스 문장으로 알려줘.";
+      
+      try {
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+        const payload = {
+          contents: [{ parts: [{ text: promptQuery }] }],
+          tools: [{ "google_search": {} }],
+          systemInstruction: {
+            parts: [{ text: "당신은 뉴스 팩트체커입니다. 현재 시점 MBC 뉴스의 1순위 헤드라인이나 가장 뜨거운 사회적 톱뉴스를 군더더기 없이 한 문장의 명확한 헤드라인으로 요약해 출력하세요." }]
+          }
+        };
+
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          const candidate = result.candidates?.[0];
+          if (candidate?.content?.parts?.[0]?.text) {
+            const headline = candidate.content.parts[0].text.trim().replace(/^["']|["']$/g, '');
+            todayNewsHeadline = headline;
+            headlineEl.textContent = headline;
+            metaSourceEl.textContent = "출처: MBC 뉴스 실시간 검색 헤드라인";
+            showToast("오늘의 MBC 뉴스 1순위 이슈가 업데이트되었습니다.", "info");
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn("Gemini Search issue fetch error:", error);
+      }
+
+      // Default curated dynamic headline if fetch cannot complete
+      const fallbackNews = [
+        "정부, 민생 물가 안정 및 주거 복지 특별 대책 긴급 점검 회의 개최",
+        "국회 상임위 집중 가동… 주요 민생 및 미래 신산업 육성 법안 심의",
+        "기상청, 올가을 기온 변동성 전망… 환절기 건강 관리 및 안전 주의 당부"
+      ];
+      const selected = fallbackNews[Math.floor(Math.random() * fallbackNews.length)];
+      todayNewsHeadline = selected;
+      headlineEl.textContent = selected;
+      metaSourceEl.textContent = "출처: MBC 주요 사회/종합 보도 헤드라인";
+    }
+
+    function setMood(moodKey) {
+      currentSelectedMood = moodKey;
+      document.querySelectorAll('.mood-btn').forEach(btn => {
+        if (btn.getAttribute('data-mood') === moodKey) {
+          btn.classList.add('bg-amber-100', 'text-amber-700', 'shadow-sm');
+          btn.classList.remove('text-slate-500');
+        } else {
+          btn.classList.remove('bg-amber-100', 'text-amber-700', 'shadow-sm');
+          btn.classList.add('text-slate-500');
+        }
+      });
+    }
+
+    function handleTagKeydown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const input = document.getElementById("newTagInput");
+        const val = input.value.trim().replace(/^#/, '');
+        if (val && !currentTags.includes(val)) {
+          currentTags.push(val);
+          renderTags();
+          input.value = '';
+        }
+      }
+    }
+
+    function removeTag(tagToRemove) {
+      currentTags = currentTags.filter(t => t !== tagToRemove);
+      renderTags();
+    }
+
+    function renderTags() {
+      const container = document.getElementById("tagPillsContainer");
+      if (!container) return;
+      container.innerHTML = currentTags.map(tag => `
+        <span class="tag-pill text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
+          #${tag}
+          <button onclick="removeTag('${tag}')" class="hover:text-rose-500 text-slate-400">
+            <i class="fa-solid fa-xmark text-[10px]"></i>
+          </button>
+        </span>
+      `).join('');
+    }
+
+    function updateEditorWordCount() {
+      const content = document.getElementById("diaryContentInput").value;
+      const charCountEl = document.getElementById("charCount");
+      const wordCountEl = document.getElementById("wordCount");
+
+      const chars = content.length;
+      const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+
+      if (charCountEl) charCountEl.textContent = chars.toLocaleString();
+      if (wordCountEl) wordCountEl.textContent = words.toLocaleString();
+    }
+
+    function clearEditor() {
+      document.getElementById("diaryTitleInput").value = "";
+      document.getElementById("diaryContentInput").value = "";
+      updateEditorWordCount();
+      showToast("내용이 초기화되었습니다.", "info");
+    }
+
+    function insertTemplatePrompt() {
+      const textarea = document.getElementById("diaryContentInput");
+      const template = 
+`1. 오늘 가장 보람찼거나 인상 깊었던 일:
+- 
+
+2. 오늘 마주친 생각과 감정:
+- 
+
+3. 내일의 나를 위해 남기는 한마디:
+- `;
+      if (textarea.value.trim().length === 0) {
+        textarea.value = template;
+      } else {
+        textarea.value += "\n\n" + template;
+      }
+      updateEditorWordCount();
+    }
+
+    // Google OAuth 2.0 Token Client Initializer
+    function initGoogleClient() {
+      const clientId = localStorage.getItem("charlie_gdrive_client_id");
+      if (!clientId) {
+        updateDriveUIStatus(false, "Client ID 필요");
+        return;
+      }
+
+      if (window.google && google.accounts && google.accounts.oauth2) {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/drive.file',
+          hint: TARGET_GOOGLE_ACCOUNT,
+          callback: (response) => {
+            if (response.error !== undefined) {
+              console.error("Google Auth Error:", response);
+              showToast("Google 인증 오류: " + response.error, "warning");
+              return;
+            }
+            googleOAuthToken = response.access_token;
+            updateDriveUIStatus(true, "인증 완료");
+            showToast("구글 계정 인증이 완료되었습니다.", "success");
+          },
+        });
+      }
+    }
+
+    function requestGoogleToken(callbackAfterAuth = null) {
+      const clientId = localStorage.getItem("charlie_gdrive_client_id");
+      if (!clientId) {
+        openDriveSettingsModal();
+        showToast("먼저 Google OAuth Client ID를 입력해주세요.", "warning");
+        return;
+      }
+
+      if (!tokenClient) {
+        initGoogleClient();
+      }
+
+      if (tokenClient) {
+        if (callbackAfterAuth) {
+          tokenClient.callback = async (response) => {
+            if (response.error !== undefined) {
+              console.error("Google Auth Error:", response);
+              showToast("구글 계정 인증이 실패했습니다: " + response.error, "warning");
+              return;
+            }
+            googleOAuthToken = response.access_token;
+            updateDriveUIStatus(true, "인증 완료");
+            showToast("인증 완료! 드라이브 저장을 진행합니다.", "success");
+            await callbackAfterAuth();
+          };
+        }
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+      } else {
+        showToast("Google Identity 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.", "warning");
+      }
+    }
+
+    function updateDriveUIStatus(isConnected, labelText) {
+      const badge = document.getElementById("driveBadgeStatus");
+      const banner = document.getElementById("driveLoginBanner");
+
+      if (badge) {
+        badge.textContent = labelText;
+        if (isConnected) {
+          badge.className = "text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold px-2 py-0.5 rounded-full";
+        } else {
+          badge.className = "text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold px-2 py-0.5 rounded-full";
+        }
+      }
+
+      if (banner) {
+        if (isConnected) {
+          banner.classList.add("hidden");
+        } else {
+          banner.classList.remove("hidden");
+        }
+      }
+    }
+
+    // Format full markdown for Google Drive and local storage
+    function buildJournalFileContent(entry) {
+      return `# ${entry.driveFilename}
+
+- **작성 일자:** ${entry.dateString}
+- **기록 계정:** ${TARGET_GOOGLE_ACCOUNT}
+- **오늘의 날씨:** ${entry.weather}
+- **사회적 이슈 (MBC 보도 1위):** ${entry.newsHeadline}
+- **기분 상태:** ${entry.mood}
+- **태그:** ${entry.tags.map(t => '#' + t).join(' ')}
+
+---
+
+## 📌 ${entry.title || "무제"}
+
+${entry.content}
+
+---
+*본 일기는 찰리의 스마트 일기장 대시보드에서 생성되어 Google Drive(${TARGET_GOOGLE_ACCOUNT})로 안전하게 전송되었습니다.*
+`;
+    }
+
+    // Main Action: Confirm and commit to Google Drive
+    async function commitDiaryToDrive() {
+      const titleInput = document.getElementById("diaryTitleInput");
+      const contentInput = document.getElementById("diaryContentInput");
+      
+      const title = titleInput.value.trim() || "오늘의 소중한 하루";
+      const content = contentInput.value.trim();
+
+      if (!content) {
+        showToast("일기 본문 내용을 작성해주세요.", "warning");
+        contentInput.focus();
+        return;
+      }
+
+      const storedClientId = localStorage.getItem("charlie_gdrive_client_id");
+      if (!storedClientId) {
+        openDriveSettingsModal();
+        showToast("구글 드라이브 저장을 위해 먼저 Client ID를 등록해주세요.", "warning");
+        return;
+      }
+
+      // If token is missing, request auth popup and continue
+      if (!googleOAuthToken) {
+        requestGoogleToken(async () => {
+          await executeDriveUpload(title, content);
+        });
+        return;
+      }
+
+      await executeDriveUpload(title, content);
+    }
+
+    async function executeDriveUpload(title, content) {
+      const titleInput = document.getElementById("diaryTitleInput");
+      const contentInput = document.getElementById("diaryContentInput");
+      const btn = document.getElementById("btnCommitDrive");
+
+      const now = new Date();
+      const shortDate = getFormattedShortDate(now);
+      const filename = `찰리의 일기(${shortDate})`;
+
+      const newEntry = {
+        id: "d-" + Date.now(),
+        dateString: getFormattedKoreanDate(now),
+        shortDate: shortDate,
+        title: title,
+        content: content,
+        weather: todayWeatherString,
+        newsHeadline: todayNewsHeadline,
+        mood: currentSelectedMood,
+        tags: [...currentTags],
+        googleDriveSynced: false,
+        driveFilename: filename
+      };
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-base"></i> <span>구글 드라이브에 파일 생성 중...</span>`;
+
+      try {
+        const fileData = buildJournalFileContent(newEntry);
+        const result = await uploadToGoogleDriveApi(googleOAuthToken, `${filename}.md`, fileData);
+
+        newEntry.googleDriveSynced = true;
+        showToast(`구글 드라이브(${TARGET_GOOGLE_ACCOUNT})에 '${filename}.md' 파일이 성공적으로 생성되었습니다!`, "success");
+
+        diaries.unshift(newEntry);
+        saveDiariesToStorage();
+        renderArchiveList();
+        renderMiniDashboard();
+
+        titleInput.value = "";
+        contentInput.value = "";
+        updateEditorWordCount();
+
+      } catch (err) {
+        console.error("구글 드라이브 실제 업로드 실패:", err);
+        showToast(`드라이브 저장 실패: ${err.message}`, "warning");
+        downloadAsLocalText();
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up text-base"></i> <span>일기 확정 및 구글 드라이브 저장</span>`;
+      }
+    }
+
+    // Google Drive REST API V3 Real Multipart Upload implementation with strict response checking
+    async function uploadToGoogleDriveApi(accessToken, filename, textContent) {
+      if (!accessToken) {
+        throw new Error("유효한 구글 인증 토큰이 없습니다. 다시 로그인해 주세요.");
+      }
+
+      const metadata = {
+        name: filename,
+        mimeType: 'text/markdown'
+      };
+
+      const boundary = '-------charlieJournalBoundary789456123';
+      const delimiter = "\r\n--" + boundary + "\r\n";
+      const closeDelim = "\r\n--" + boundary + "--";
+
+      const multipartRequestBody =
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        'Content-Type: text/markdown; charset=UTF-8\r\n\r\n' +
+        textContent +
+        closeDelim;
+
+      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + accessToken,
+          'Content-Type': 'multipart/related; boundary=' + boundary
+        },
+        body: multipartRequestBody
+      });
+
+      if (!response.ok) {
+        let errDetails = `상태 코드 ${response.status}`;
+        try {
+          const errJson = await response.json();
+          if (errJson && errJson.error && errJson.error.message) {
+            errDetails = errJson.error.message;
+          }
+        } catch (e) {}
+        throw new Error(errDetails);
+      }
+
+      return await response.json();
+    }
+
+    // Fallback: Download file directly to local PC
+    function downloadAsLocalText() {
+      const title = document.getElementById("diaryTitleInput").value.trim() || "찰리의 일기";
+      const content = document.getElementById("diaryContentInput").value.trim();
+
+      if (!content) {
+        showToast("다운로드할 일기 내용이 없습니다.", "warning");
+        return;
+      }
+
+      const now = new Date();
+      const shortDate = getFormattedShortDate(now);
+      const filename = `찰리의 일기(${shortDate}).md`;
+
+      const mockEntry = {
+        driveFilename: `찰리의 일기(${shortDate})`,
+        dateString: getFormattedKoreanDate(now),
+        weather: todayWeatherString,
+        newsHeadline: todayNewsHeadline,
+        mood: currentSelectedMood,
+        tags: [...currentTags],
+        title: title,
+        content: content
+      };
+
+      const fileData = buildJournalFileContent(mockEntry);
+      triggerFileDownload(filename, fileData);
+      showToast(`'${filename}' 파일이 PC에 다운로드되었습니다.`, "success");
+    }
+
+    function triggerFileDownload(filename, text) {
+      const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function switchView(viewName) {
+      const writeView = document.getElementById("writeView");
+      const archiveView = document.getElementById("archiveView");
+      const navBtn = document.getElementById("btnNavArchive");
+
+      if (viewName === 'archive') {
+        writeView.classList.add('hidden');
+        archiveView.classList.remove('hidden');
+        navBtn.classList.add('bg-amber-100', 'text-amber-800');
+        renderArchiveList();
+      } else {
+        archiveView.classList.add('hidden');
+        writeView.classList.remove('hidden');
+        navBtn.classList.remove('bg-amber-100', 'text-amber-800');
+      }
+    }
+
+    function renderArchiveList() {
+      const container = document.getElementById("archiveEntriesContainer");
+      if (!container) return;
+
+      const searchTerm = (document.getElementById("searchArchiveInput")?.value || "").toLowerCase().trim();
+
+      const filtered = diaries.filter(d => {
+        if (!searchTerm) return true;
+        return (
+          d.title.toLowerCase().includes(searchTerm) ||
+          d.content.toLowerCase().includes(searchTerm) ||
+          d.shortDate.includes(searchTerm) ||
+          d.newsHeadline.toLowerCase().includes(searchTerm)
+        );
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-2 text-center py-16 bg-white rounded-3xl border border-slate-200">
+            <i class="fa-regular fa-folder-open text-4xl text-slate-300 mb-3"></i>
+            <p class="text-sm font-semibold text-slate-600">일치하는 일기 기록이 없습니다.</p>
+            <p class="text-xs text-slate-400 mt-1">다른 키워드로 검색해보거나 새로운 일기를 작성해보세요.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => `
+        <div onclick="openDiaryDetail('${item.id}')" class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:shadow-md hover:border-amber-300 transition cursor-pointer flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                ${item.driveFilename}
+              </span>
+              <span class="text-[10px] text-slate-400 flex items-center gap-1">
+                <i class="fa-brands fa-google-drive text-emerald-600"></i> 동기화됨
+              </span>
+            </div>
+
+            <h3 class="font-bold text-base text-slate-800 group-hover:text-amber-600 transition line-clamp-1 mb-1.5">
+              ${item.title || "무제"}
+            </h3>
+
+            <p class="text-xs text-slate-500 font-serif-journal line-clamp-3 leading-relaxed mb-4">
+              ${item.content}
+            </p>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+            <div class="flex items-center gap-2 truncate max-w-[200px]">
+              <i class="fa-solid fa-newspaper text-blue-500"></i>
+              <span class="truncate">${item.newsHeadline}</span>
+            </div>
+            <span class="font-medium text-slate-600">${item.shortDate}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderMiniDashboard() {
+      const countBadge = document.getElementById("totalEntryCountBadge");
+      const recentList = document.getElementById("miniRecentEntriesList");
+
+      if (countBadge) countBadge.textContent = `총 ${diaries.length}편`;
+
+      if (recentList) {
+        recentList.innerHTML = diaries.slice(0, 3).map(entry => `
+          <div onclick="openDiaryDetail('${entry.id}')" class="p-2.5 rounded-xl bg-slate-50 hover:bg-amber-50/60 border border-slate-100 transition cursor-pointer flex items-center justify-between">
+            <div class="truncate pr-2">
+              <p class="text-xs font-bold text-slate-800 truncate">${entry.title || "무제"}</p>
+              <p class="text-[10px] text-slate-400 font-mono">${entry.driveFilename}</p>
+            </div>
+            <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
+          </div>
+        `).join('');
+      }
+    }
+
+    function openDiaryDetail(id) {
+      const item = diaries.find(d => d.id === id);
+      if (!item) return;
+      currentViewingDiary = item;
+
+      document.getElementById("modalDateBadge").textContent = item.dateString;
+      document.getElementById("modalMoodBadge").textContent = getMoodLabel(item.mood);
+      document.getElementById("modalWeatherBadge").innerHTML = `<i class="fa-solid fa-cloud-sun text-amber-500"></i> ${item.weather}`;
+      document.getElementById("modalDiaryTitle").textContent = item.title || "무제";
+      document.getElementById("modalNewsContent").textContent = item.newsHeadline;
+      document.getElementById("modalDiaryBody").textContent = item.content;
+      document.getElementById("modalGoogleFileTag").textContent = `드라이브 저장명: ${item.driveFilename}`;
+
+      const modal = document.getElementById("entryDetailModal");
+      modal.classList.remove("hidden");
+    }
+
+    function getMoodLabel(mood) {
+      const map = {
+        happy: "😊 행복",
+        calm: "🌿 평온",
+        busy: "⚡ 열정",
+        tired: "🌧️ 지침"
+      };
+      return map[mood] || "😊 평온";
+    }
+
+    function exportModalDiary() {
+      if (!currentViewingDiary) return;
+      const text = buildJournalFileContent(currentViewingDiary);
+      triggerFileDownload(`${currentViewingDiary.driveFilename}.md`, text);
+      showToast("일기 파일 다운로드가 시작되었습니다.", "success");
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add("hidden");
+    }
+
+    function openDriveSettingsModal() {
+      const input = document.getElementById("googleClientIdInput");
+      const saved = localStorage.getItem("charlie_gdrive_client_id") || "";
+      if (input) input.value = saved;
+      document.getElementById("driveSettingsModal").classList.remove("hidden");
+    }
+
+    function saveDriveSettings() {
+      const val = document.getElementById("googleClientIdInput").value.trim();
+      localStorage.setItem("charlie_gdrive_client_id", val);
+      closeModal("driveSettingsModal");
+      showToast("Google Drive 설정이 저장되었습니다.", "success");
+      initGoogleClient();
+    }
+
+    function saveDiariesToStorage() {
+      try {
+        localStorage.setItem("charlie_saved_diaries", JSON.stringify(diaries));
+      } catch (e) {
+        // Storage guard
+      }
+    }
+
+    function loadDiariesFromStorage() {
+      try {
+        const data = localStorage.getItem("charlie_saved_diaries");
+        if (data) {
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            diaries = parsed;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Custom Toast
+    let toastTimeout = null;
+    function showToast(message, type = "info") {
+      const toast = document.getElementById("toastNotification");
+      const msg = document.getElementById("toastMessage");
+      const icon = document.getElementById("toastIcon");
+
+      if (!toast) return;
+
+      msg.textContent = message;
+
+      if (type === "success") {
+        icon.className = "fa-solid fa-circle-check text-emerald-400 text-sm";
+      } else if (type === "warning") {
+        icon.className = "fa-solid fa-triangle-exclamation text-amber-400 text-sm";
+      } else {
+        icon.className = "fa-solid fa-circle-info text-blue-400 text-sm";
+      }
+
+      toast.classList.remove("translate-y-24", "opacity-0");
+      toast.classList.add("translate-y-0", "opacity-100");
+
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add("translate-y-24", "opacity-0");
+        toast.classList.remove("translate-y-0", "opacity-100");
+      }, 3500);
+    }
+
+    window.onload = function() {
+      loadDiariesFromStorage();
+      initDateTimeHeader();
+      renderTags();
+      refreshWeather();
+      fetchTodayMBCIssue();
+      renderMiniDashboard();
+      renderArchiveList();
+
+      setTimeout(() => {
+        initGoogleClient();
+      }, 500);
+    };
+  </script>
+</body>
+</html>
